@@ -1,0 +1,1023 @@
+{
+  "name": "M3: Status updates on the original thread",
+  "nodes": [
+    {
+      "id": "b3c0d1e2-0001-4d2e-8b31-000000000001",
+      "name": "Every 5 minutes",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        0,
+        200
+      ],
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "minutes",
+              "minutesInterval": 5
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "b3c0d1e2-0002-4d2e-8b31-000000000002",
+      "name": "Settings",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        220,
+        200
+      ],
+      "parameters": {
+        "mode": "manual",
+        "assignments": {
+          "assignments": [
+            {
+              "id": "s1",
+              "name": "shadowMode",
+              "value": true,
+              "type": "boolean"
+            },
+            {
+              "id": "s2",
+              "name": "ourAddress",
+              "value": "dispatch@example.com",
+              "type": "string"
+            },
+            {
+              "id": "s3",
+              "name": "timezone",
+              "value": "America/Denver",
+              "type": "string"
+            },
+            {
+              "id": "s4",
+              "name": "quietFrom",
+              "value": 20,
+              "type": "number"
+            },
+            {
+              "id": "s5",
+              "name": "quietTo",
+              "value": 7,
+              "type": "number"
+            },
+            {
+              "id": "s6",
+              "name": "approveFirst",
+              "value": 5,
+              "type": "number"
+            },
+            {
+              "id": "s7",
+              "name": "newTemplates",
+              "value": "Harbor Appliance Care",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "b3c0d1e2-0003-4d2e-8b31-000000000003",
+      "name": "Read jobs",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [
+        440,
+        200
+      ],
+      "parameters": {
+        "documentId": {
+          "__rl": true,
+          "mode": "url",
+          "value": "https://docs.google.com/spreadsheets/d/REPLACE_WITH_YOUR_SHEET_ID/edit"
+        },
+        "sheetName": {
+          "__rl": true,
+          "mode": "name",
+          "value": "Jobs"
+        },
+        "options": {}
+      },
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "REPLACE",
+          "name": "Google Sheets (Summit ops)"
+        }
+      },
+      "executeOnce": true,
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 5000
+    },
+    {
+      "id": "b3c0d1e2-0004-4d2e-8b31-000000000004",
+      "name": "Read update log",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [
+        660,
+        200
+      ],
+      "parameters": {
+        "documentId": {
+          "__rl": true,
+          "mode": "url",
+          "value": "https://docs.google.com/spreadsheets/d/REPLACE_WITH_YOUR_SHEET_ID/edit"
+        },
+        "sheetName": {
+          "__rl": true,
+          "mode": "name",
+          "value": "Update Log"
+        },
+        "options": {}
+      },
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "REPLACE",
+          "name": "Google Sheets (Summit ops)"
+        }
+      },
+      "executeOnce": true,
+      "alwaysOutputData": true,
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 5000
+    },
+    {
+      "id": "b3c0d1e2-0005-4d2e-8b31-000000000005",
+      "name": "Build updates",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        880,
+        200
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "// Find jobs whose status changed, and build each update.\n// Input: Settings, every row of \"Jobs\" and of \"Update Log\".\n// Output: one item per changed job, with action = post | skip | queued.\nconst cfg = $('Settings').first().json;\nconst jobs = $('Read jobs').all().map(i => i.json);\nconst log = $('Read update log').all().map(i => i.json);\nconst seen = {}, queuedSeen = {};\nfor (const r of log) {\n  if (!r.Key || ['skipped', 'error'].includes(r.Result)) continue;\n  if (r.Result === 'queued') queuedSeen[r.Key] = true; else seen[r.Key] = r.Result;\n}\n// Approve the first 5: a person sends the held draft from Gmail, then changes its log row\n// from \"person\" to \"approved\". Approved rows are counted per vendor.\nconst vendorOfJob = {};\nfor (const j of jobs) vendorOfJob[j['Job ID']] = j.Vendor;\nconst approvedCount = {};\nfor (const r of log) if (r.Result === 'approved') { const v = vendorOfJob[r['Job ID']]; approvedCount[v] = (approvedCount[v] || 0) + 1; }\n\nconst VENDORS = {\n  'Bluepeak Protection Plans': { audience: 'vendor', domain: 'bluepeak-protection.example', style: 'vendor' },\n  'Harbor Appliance Care':     { audience: 'vendor', domain: 'harbor-appliance.example', style: 'vendor' },\n  'Northstar Home Warranty':   { audience: 'vendor', domain: 'northstar-warranty.example', style: 'vendor' },\n  'Direct customer':           { audience: 'homeowner', style: 'homeowner' },\n};\nconst tz = cfg.timezone;\nconst fmt = (d, o) => d ? new Date(d).toLocaleString('en-US', Object.assign({ timeZone: tz }, o)) : '';\nconst hourNow = Number(new Date().toLocaleString('en-US', { timeZone: tz, hour: 'numeric', hourCycle: 'h23' }));\nconst quiet = hourNow >= cfg.quietFrom || hourNow < cfg.quietTo;\n\nfunction keyOf(j) {\n  const d = j['Window Start'] || j['Part ETA'];\n  return [j['Job ID'], j.Status, d ? new Date(d).toISOString().slice(0, 16) : ''].filter(Boolean).join('|');\n}\nfunction render(v, j) {\n  const claim = j['Claim #'], tech = j.Tech || 'a Summit technician', first = String(j.Customer || '').split(' ')[0];\n  const win = fmt(j['Window Start'], { dateStyle: 'short', timeStyle: 'short' }) + '–' + fmt(j['Window End'], { timeStyle: 'short' });\n  if (v.style === 'vendor') {\n    const t = {\n      received: `Claim ${claim}: received and accepted by Summit Home Services (our job ${j['Job ID']}). We will contact the homeowner and post the appointment on this thread.`,\n      scheduled: `Claim ${claim}: appointment set for ${win}. Technician: ${tech}.`,\n      rescheduled: `Claim ${claim}: appointment moved to ${win} at the homeowner's request. Technician: ${tech}.`,\n      en_route: `Claim ${claim}: technician ${tech} is on the way. ETA ${fmt(j.ETA, { timeStyle: 'short' })}.`,\n      waiting_parts: `Claim ${claim}: diagnosed, waiting on parts. Part: ${j.Part}, ETA ${fmt(j['Part ETA'], { dateStyle: 'short' })}. We will post the return visit here.`,\n      completed: `Claim ${claim}: completed. Work done: ${j['Work Done']}. Completion report attached.`,\n    }[j.Status];\n    return t + '\\n\\nSummit Home Services dispatch · (555) 010-4400\\nAutomated update. Reply here and a person will read it.';\n  }\n  const day = fmt(j['Window Start'], { weekday: 'long', month: 'short', day: 'numeric' });\n  const t = {\n    received: `Hi ${first}, thanks for getting in touch. We have your request (job ${j['Job ID']}). Someone will call you within 4 hours to set a time.`,\n    scheduled: `Hi ${first}, you're booked: ${tech} will come ${day}, ${win.split(', ')[1] || ''}.`,\n    rescheduled: `Hi ${first}, as you asked, we've moved your appointment to ${day}.`,\n    en_route: `Hi ${first}, ${tech.split(' ')[0]} is on the way and should be with you around ${fmt(j.ETA, { timeStyle: 'short' })}.`,\n    waiting_parts: `Hi ${first}, the ${String(j.Part).toLowerCase()} needs replacing. It's ordered and should arrive ${fmt(j['Part ETA'], { weekday: 'long', month: 'short', day: 'numeric' })}.`,\n    completed: `Hi ${first}, all done. ${j['Work Done']} Your report is attached. Thanks for choosing Summit!`,\n  }[j.Status];\n  return t + '\\n\\nSummit Home Services · (555) 010-4400\\nJust reply to this email if anything changes.';\n}\n\nconst out = [];\nfor (const j of jobs) {\n  if (!j['Job ID'] || !j.Status) continue;\n  const key = keyOf(j);\n  if (String(j['Last Notified Key']) === key) continue;                 // nothing new\n  const v = VENDORS[j.Vendor] || VENDORS['Direct customer'];\n  const base = { jobId: j['Job ID'], status: j.Status, key, vendor: j.Vendor, row: j.row_number };\n  // Never twice\n  if (seen[key] === 'person') continue;                                // waiting for a person; never retried by itself\n  if (seen[key]) { out.push({ json: { ...base, action: 'skip', note: 'Already ' + seen[key] + ', skipped' } }); continue; }\n  // Quiet hours for homeowners: not now. The first run after 7 AM picks it up.\n  if (v.audience === 'homeowner' && quiet) {\n    if (!queuedSeen[key]) out.push({ json: { ...base, action: 'queued', note: 'Quiet hours: waits until 7:00 AM' } });\n    continue;\n  }\n  const who = v.audience === 'homeowner' ? String(j['Customer Email']).toLowerCase() : v.domain;\n  const isNew = (cfg.newTemplates || '').split(',').map(s => s.trim()).includes(j.Vendor);\n  out.push({ json: { ...base, action: 'post', text: render(v, j), who, claim: j['Claim #'] || '', threadId: j['Thread ID'] || '',\n    query: `\"${j['Claim #']}\" from:${who} newer_than:180d -in:drafts`,\n    needsApproval: isNew && (approvedCount[j.Vendor] || 0) < cfg.approveFirst, shadow: cfg.shadowMode } });\n}\nreturn out;"
+      }
+    },
+    {
+      "id": "b3c0d1e2-0006-4d2e-8b31-000000000006",
+      "name": "Update to post?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        1100,
+        200
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "combinator": "and",
+          "conditions": [
+            {
+              "id": "c1",
+              "leftValue": "={{ $json.action }}",
+              "rightValue": "post",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ]
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "b3c0d1e2-0007-4d2e-8b31-000000000007",
+      "name": "Find original thread",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1320,
+        100
+      ],
+      "parameters": {
+        "url": "={{ $json.threadId ? 'https://gmail.googleapis.com/gmail/v1/users/me/threads/' + $json.threadId + '?format=minimal' : 'https://gmail.googleapis.com/gmail/v1/users/me/threads?maxResults=5&q=' + encodeURIComponent($json.query) }}",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "gmailOAuth2",
+        "options": {
+          "response": {
+            "response": {
+              "neverError": true
+            }
+          }
+        }
+      },
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "REPLACE",
+          "name": "Gmail (dispatch@example.com)"
+        }
+      },
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 5000
+    },
+    {
+      "id": "b3c0d1e2-0008-4d2e-8b31-000000000008",
+      "name": "Right thread?",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1540,
+        100
+      ],
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "// Right thread or no send: exactly one thread, or a person decides.\nconst job = $('Build updates').item.json;\nconst r = $json;\nlet ids = [];\nif (job.threadId) ids = r.id ? [r.id] : [];                    // saved thread: fetched by ID\nelse ids = (r.threads || []).map(t => t.id);                   // search by claim #\nconst why = ids.length === 0\n  ? `No thread matches ${job.claim || job.jobId}. It never starts a new thread.`\n  : `${ids.length} threads match claim ${job.claim}. It will not guess which one the vendor is watching.`;\nreturn { json: { ...job, matchCount: ids.length, threadId: ids.length === 1 ? ids[0] : '', why: ids.length === 1 ? '' : why } };"
+      }
+    },
+    {
+      "id": "b3c0d1e2-0009-4d2e-8b31-000000000009",
+      "name": "Exactly one thread?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        1760,
+        100
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "combinator": "and",
+          "conditions": [
+            {
+              "id": "c1",
+              "leftValue": "={{ $json.matchCount === 1 }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ]
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "b3c0d1e2-0010-4d2e-8b31-000000000010",
+      "name": "Get thread messages",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1980,
+        0
+      ],
+      "parameters": {
+        "url": "={{ 'https://gmail.googleapis.com/gmail/v1/users/me/threads/' + $json.threadId + '?format=metadata&metadataHeaders=From&metadataHeaders=Subject&metadataHeaders=Message-ID&metadataHeaders=Reply-To' }}",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "gmailOAuth2",
+        "options": {}
+      },
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "REPLACE",
+          "name": "Gmail (dispatch@example.com)"
+        }
+      },
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 5000
+    },
+    {
+      "id": "b3c0d1e2-0011-4d2e-8b31-000000000011",
+      "name": "Customer replied?",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2200,
+        0
+      ],
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "// Customer replied? If the newest message is from them and UNREAD, pause and ask a person.\n// Otherwise build the reply as a raw RFC 822 message with the right Re: subject and headers.\nconst job = $('Right thread?').item.json;\nconst msgs = $json.messages || [];\nconst last = msgs[msgs.length - 1] || {};\nconst hdr = (m, n) => ((m.payload || {}).headers || []).find(h => h.name.toLowerCase() === n.toLowerCase())?.value || '';\nconst lastFrom = hdr(last, 'From').toLowerCase();\nconst fromUs = lastFrom.includes($('Settings').first().json.ourAddress.toLowerCase());\nconst unread = (last.labelIds || []).includes('UNREAD');\nif (!fromUs && unread) {\n  return { json: { ...job, paused: true, why: `${hdr(last, 'From')} wrote on this thread and nobody has read it. Updates here are paused.` } };\n}\nconst subject0 = hdr(msgs[0] || {}, 'Subject');\nconst subject = /^re:/i.test(subject0) ? subject0 : 'Re: ' + subject0;\nconst refs = msgs.map(m => hdr(m, 'Message-ID')).filter(Boolean).join(' ');\nconst to = hdr(msgs[0] || {}, 'Reply-To') || hdr(msgs[0] || {}, 'From');\nconst raw = [\n  `To: ${to}`, `Subject: ${subject}`, `In-Reply-To: ${hdr(last, 'Message-ID')}`, `References: ${refs}`,\n  'Content-Type: text/plain; charset=UTF-8', '', job.text,\n].join('\\r\\n');\nconst b64 = Buffer.from(raw, 'utf8').toString('base64').replace(/\\+/g, '-').replace(/\\//g, '_').replace(/=+$/, '');\nreturn { json: { ...job, paused: false, raw: b64 } };"
+      }
+    },
+    {
+      "id": "b3c0d1e2-0012-4d2e-8b31-000000000012",
+      "name": "Paused for a person?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        2420,
+        0
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "combinator": "and",
+          "conditions": [
+            {
+              "id": "c1",
+              "leftValue": "={{ $json.paused }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ]
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "b3c0d1e2-0013-4d2e-8b31-000000000013",
+      "name": "Draft only? (shadow or approval)",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        2640,
+        100
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "combinator": "and",
+          "conditions": [
+            {
+              "id": "c1",
+              "leftValue": "={{ $json.shadow || $json.needsApproval }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ]
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "b3c0d1e2-0014-4d2e-8b31-000000000014",
+      "name": "Create draft on thread",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        2860,
+        0
+      ],
+      "parameters": {
+        "method": "POST",
+        "url": "https://gmail.googleapis.com/gmail/v1/users/me/drafts",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "gmailOAuth2",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ message: { threadId: $json.threadId, raw: $json.raw } }) }}",
+        "options": {}
+      },
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "REPLACE",
+          "name": "Gmail (dispatch@example.com)"
+        }
+      },
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 5000
+    },
+    {
+      "id": "b3c0d1e2-0015-4d2e-8b31-000000000015",
+      "name": "Mark draft result",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        3080,
+        0
+      ],
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "// Count a send toward \"approve the first 5\" only when a person approves it.\n// (A person sends the draft from Gmail; this node only records that a draft was made.)\nreturn { json: { ...$('Draft only? (shadow or approval)').item.json, result: $('Draft only? (shadow or approval)').item.json.needsApproval ? 'person' : 'drafted', note: $('Draft only? (shadow or approval)').item.json.needsApproval\n  ? 'New template: draft waiting for a person to approve (send it from Gmail)' : 'SHADOW: draft on thread ' + $('Draft only? (shadow or approval)').item.json.threadId } };"
+      }
+    },
+    {
+      "id": "b3c0d1e2-0016-4d2e-8b31-000000000016",
+      "name": "Reply on thread",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        2860,
+        200
+      ],
+      "parameters": {
+        "method": "POST",
+        "url": "https://gmail.googleapis.com/gmail/v1/users/me/messages/send",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "gmailOAuth2",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ threadId: $json.threadId, raw: $json.raw }) }}",
+        "options": {}
+      },
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "REPLACE",
+          "name": "Gmail (dispatch@example.com)"
+        }
+      },
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 5000
+    },
+    {
+      "id": "b3c0d1e2-0017-4d2e-8b31-000000000017",
+      "name": "Mark sent",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        3080,
+        200
+      ],
+      "parameters": {
+        "mode": "manual",
+        "includeOtherFields": false,
+        "assignments": {
+          "assignments": [
+            {
+              "id": "m1",
+              "name": "jobId",
+              "value": "={{ $('Draft only? (shadow or approval)').item.json.jobId }}",
+              "type": "string"
+            },
+            {
+              "id": "m2",
+              "name": "status",
+              "value": "={{ $('Draft only? (shadow or approval)').item.json.status }}",
+              "type": "string"
+            },
+            {
+              "id": "m3",
+              "name": "key",
+              "value": "={{ $('Draft only? (shadow or approval)').item.json.key }}",
+              "type": "string"
+            },
+            {
+              "id": "m4",
+              "name": "threadId",
+              "value": "={{ $('Draft only? (shadow or approval)').item.json.threadId }}",
+              "type": "string"
+            },
+            {
+              "id": "m5",
+              "name": "result",
+              "value": "sent",
+              "type": "string"
+            },
+            {
+              "id": "m6",
+              "name": "note",
+              "value": "Replied on the original thread",
+              "type": "string"
+            },
+            {
+              "id": "m7",
+              "name": "row",
+              "value": "={{ $('Draft only? (shadow or approval)').item.json.row }}",
+              "type": "number"
+            }
+          ]
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "b3c0d1e2-0018-4d2e-8b31-000000000018",
+      "name": "Needs a person (Slack)",
+      "type": "n8n-nodes-base.slack",
+      "typeVersion": 2.2,
+      "position": [
+        2860,
+        -300
+      ],
+      "parameters": {
+        "select": "channel",
+        "channelId": {
+          "__rl": true,
+          "mode": "name",
+          "value": "#office"
+        },
+        "text": "=*Needs a person: {{ $json.jobId }} {{ $json.status }} update was NOT posted*\n{{ $json.why || $json.note }}\nKey: `{{ $json.key }}`\n\nThe update it was going to post:\n```{{ $json.text }}```",
+        "otherOptions": {}
+      },
+      "credentials": {
+        "slackApi": {
+          "id": "REPLACE",
+          "name": "Slack (Summit)"
+        }
+      },
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 5000
+    },
+    {
+      "id": "b3c0d1e2-0019-4d2e-8b31-000000000019",
+      "name": "Mark held",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2640,
+        -200
+      ],
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "// Everything that needs a person: no thread, two threads, an unread customer reply, or a new template.\nreturn { json: { ...$json, result: 'person', note: $json.why || $json.note } };"
+      }
+    },
+    {
+      "id": "b3c0d1e2-0020-4d2e-8b31-000000000020",
+      "name": "Done with this update?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        3740,
+        200
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "combinator": "and",
+          "conditions": [
+            {
+              "id": "c1",
+              "leftValue": "={{ ['sent', 'drafted', 'skipped'].includes($json.Result) }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ]
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "b3c0d1e2-0021-4d2e-8b31-000000000021",
+      "name": "Approval needed?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        3300,
+        0
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "combinator": "and",
+          "conditions": [
+            {
+              "id": "c1",
+              "leftValue": "={{ $json.result === \"person\" }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ]
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "b3c0d1e2-0022-4d2e-8b31-000000000022",
+      "name": "Append to update log",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [
+        3520,
+        200
+      ],
+      "parameters": {
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "mode": "url",
+          "value": "https://docs.google.com/spreadsheets/d/REPLACE_WITH_YOUR_SHEET_ID/edit"
+        },
+        "sheetName": {
+          "__rl": true,
+          "mode": "name",
+          "value": "Update Log"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "Timestamp": "={{ $now.toISO() }}",
+            "Job ID": "={{ $json.jobId }}",
+            "Status": "={{ $json.status }}",
+            "Key": "={{ $json.key }}",
+            "Result": "={{ $json.result || ($json.action === \"skip\" ? \"skipped\" : $json.action) }}",
+            "Thread": "={{ $json.threadId || \"\" }}",
+            "Note": "={{ $json.note || $json.why || \"\" }}"
+          },
+          "matchingColumns": [],
+          "schema": []
+        },
+        "options": {}
+      },
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "REPLACE",
+          "name": "Google Sheets (Summit ops)"
+        }
+      },
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 5000
+    },
+    {
+      "id": "b3c0d1e2-0023-4d2e-8b31-000000000023",
+      "name": "Save last notified key",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [
+        3960,
+        100
+      ],
+      "parameters": {
+        "operation": "update",
+        "documentId": {
+          "__rl": true,
+          "mode": "url",
+          "value": "https://docs.google.com/spreadsheets/d/REPLACE_WITH_YOUR_SHEET_ID/edit"
+        },
+        "sheetName": {
+          "__rl": true,
+          "mode": "name",
+          "value": "Jobs"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "Job ID": "={{ $json[\"Job ID\"] }}",
+            "Last Notified Key": "={{ $json.Key }}",
+            "Thread ID": "={{ $json.Thread }}"
+          },
+          "matchingColumns": [
+            "Job ID"
+          ],
+          "schema": []
+        },
+        "options": {}
+      },
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "REPLACE",
+          "name": "Google Sheets (Summit ops)"
+        }
+      },
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 5000
+    },
+    {
+      "id": "b3c0d1e2-0024-4d2e-8b31-000000000024",
+      "name": "Note: safety rules",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        860,
+        -260
+      ],
+      "parameters": {
+        "width": 520,
+        "height": 240,
+        "content": "## Safety rules in this workflow\n- **Shadow mode** (Settings → shadowMode, default true): drafts on the right thread, nothing sent.\n- **Right thread or no send**: exactly one thread, else Slack a person. Never starts a new thread.\n- **Never twice**: key = job + status + window, checked against the Update Log.\n- **Quiet hours**: homeowners 8 PM–7 AM wait for the morning run. Vendors exempt.\n- **Customer replied?** Newest message unread and not from us → pause, Slack a person.\n- **Approve the first 5** of a new template: draft + Slack. A person sends it, then marks the log row approved.\n- Every Gmail, Sheets and Slack node retries 3 times."
+      }
+    }
+  ],
+  "connections": {
+    "Every 5 minutes": {
+      "main": [
+        [
+          {
+            "node": "Settings",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Settings": {
+      "main": [
+        [
+          {
+            "node": "Read jobs",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Read jobs": {
+      "main": [
+        [
+          {
+            "node": "Read update log",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Read update log": {
+      "main": [
+        [
+          {
+            "node": "Build updates",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build updates": {
+      "main": [
+        [
+          {
+            "node": "Update to post?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Update to post?": {
+      "main": [
+        [
+          {
+            "node": "Find original thread",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Append to update log",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Find original thread": {
+      "main": [
+        [
+          {
+            "node": "Right thread?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Right thread?": {
+      "main": [
+        [
+          {
+            "node": "Exactly one thread?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Exactly one thread?": {
+      "main": [
+        [
+          {
+            "node": "Get thread messages",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Mark held",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get thread messages": {
+      "main": [
+        [
+          {
+            "node": "Customer replied?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Customer replied?": {
+      "main": [
+        [
+          {
+            "node": "Paused for a person?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Paused for a person?": {
+      "main": [
+        [
+          {
+            "node": "Mark held",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Draft only? (shadow or approval)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Draft only? (shadow or approval)": {
+      "main": [
+        [
+          {
+            "node": "Create draft on thread",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Reply on thread",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Create draft on thread": {
+      "main": [
+        [
+          {
+            "node": "Mark draft result",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Mark draft result": {
+      "main": [
+        [
+          {
+            "node": "Approval needed?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Approval needed?": {
+      "main": [
+        [
+          {
+            "node": "Mark held",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Append to update log",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Reply on thread": {
+      "main": [
+        [
+          {
+            "node": "Mark sent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Mark sent": {
+      "main": [
+        [
+          {
+            "node": "Append to update log",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Mark held": {
+      "main": [
+        [
+          {
+            "node": "Needs a person (Slack)",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Append to update log",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Append to update log": {
+      "main": [
+        [
+          {
+            "node": "Done with this update?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Done with this update?": {
+      "main": [
+        [
+          {
+            "node": "Save last notified key",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "timezone": "America/Denver",
+    "saveDataErrorExecution": "all",
+    "saveDataSuccessExecution": "all",
+    "errorWorkflow": "REPLACE_WITH_ERROR_WORKFLOW_ID"
+  },
+  "pinData": {},
+  "meta": {
+    "templateCredsSetupCompleted": false
+  },
+  "tags": [
+    {
+      "name": "summit-demo"
+    },
+    {
+      "name": "M3"
+    }
+  ]
+}

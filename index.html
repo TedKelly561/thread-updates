@@ -1,0 +1,149 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Thread Updates · Ted Kelly</title>
+<meta name="description" content="Job status updates posted as replies on the customer's or warranty company's own email thread, helpdesk ticket or portal. Right thread or no send, never twice, quiet hours, and a person in the loop. A demo by Ted Kelly with fictional data.">
+<meta name="color-scheme" content="light dark">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Space+Grotesk:wght@500;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="shared/demo.css">
+<link rel="stylesheet" href="app.css">
+<link rel="icon" href="favicon.svg" type="image/svg+xml">
+</head>
+<body>
+
+<div class="demo-bar"><a href="https://tedkelly.dev/">← Ted Kelly</a><span class="pill">DEMO</span><span>Fictional company & data</span><span class="spacer"></span><a href="https://github.com/TedKelly561/thread-updates">View code</a></div>
+
+<header class="app-head">
+  <div class="co">Summit Home Services · Office tools · M3</div>
+  <h1>Every update lands in the thread they're already reading. Nobody has to ask “where's my tech?”</h1>
+  <p>When a job moves (received, scheduled, tech on the way, done), a short, correct update is posted as a reply on the customer's or warranty company's own email thread, helpdesk ticket or portal. If it can't find the right thread, or the customer has just written something, it stops and asks a person.</p>
+</header>
+
+<main class="wrap">
+
+  <!-- 1. Before / after -->
+  <section class="card ba" id="ba" aria-labelledby="baTitle">
+    <div class="sec-head">
+      <div>
+        <h2 id="baTitle">One job, two ways</h2>
+        <p class="muted small" id="baSub"></p>
+      </div>
+    </div>
+    <div class="changed" aria-label="What changed (illustrative numbers for this demo job)">
+      <div class="changed-k"><b>What changed</b><span>Illustrative numbers for this demo job</span></div>
+      <dl class="changed-list" id="changed"></dl>
+    </div>
+    <div class="seg ba-seg" role="group" aria-label="Show before or after">
+      <button type="button" data-ba="before" aria-pressed="true">Before</button>
+      <button type="button" data-ba="after" aria-pressed="false">After</button>
+    </div>
+    <div class="ba-grid" id="baGrid" data-show="before">
+      <article class="ba-col before" aria-labelledby="beforeH">
+        <div class="ba-h"><span class="chip bad">Before</span><h3 id="beforeH">The office answers by hand</h3></div>
+        <div class="convo" id="beforeConvo"></div>
+      </article>
+      <article class="ba-col after" aria-labelledby="afterH">
+        <div class="ba-h"><span class="chip good">After</span><h3 id="afterH">Updates post themselves, on the same thread</h3></div>
+        <div class="convo" id="afterConvo"></div>
+      </article>
+    </div>
+  </section>
+
+  <!-- 2. Mode + counters + clock -->
+  <section class="card modebar" id="modebar" aria-label="Run mode, counters and demo clock">
+    <div class="mode">
+      <label class="switch" for="shadow">
+        <input type="checkbox" id="shadow" role="switch" aria-describedby="shadowDesc">
+        <span class="track" aria-hidden="true"><span class="thumb"></span></span>
+        <span class="sw-label">Shadow mode <span class="sw-state" id="shadowState">ON</span></span>
+      </label>
+      <p id="shadowDesc" class="small"></p>
+    </div>
+    <dl class="counters" id="counters" aria-live="polite"></dl>
+    <div class="clockbox">
+      <div class="clock-k">Demo clock</div>
+      <div class="clock-v"><b id="clock">10:12 AM</b> <span id="clockDay" class="muted small"></span> <span class="chip warn" id="quietChip" hidden>Quiet hours for homeowners</span></div>
+      <div class="row clock-btns">
+        <button type="button" class="btn ghost small" id="eveningBtn">Jump to 8:50 PM</button>
+        <button type="button" class="btn ghost small" id="morningBtn" hidden>Skip to 7:00 AM</button>
+        <button type="button" class="btn ghost small" id="resetAll">Reset demo</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- 3. Simulator -->
+  <div class="sim">
+    <section class="card sim-left" aria-labelledby="simTitle">
+      <div class="sec-head">
+        <h2 id="simTitle">Try it: move a job along</h2>
+      </div>
+      <p class="sec-intro small muted">Pick a job, then press the next status. Each press runs the same checks the real automation runs, and the reply appears on that job's thread.</p>
+      <div class="jobs" id="jobs" role="group" aria-label="Sample jobs"></div>
+      <div class="jobcard" id="jobcard"></div>
+    </section>
+
+    <section class="card sim-right" id="threadPane" aria-labelledby="threadTitle">
+      <div class="sec-head">
+        <h2 id="threadTitle">The thread</h2>
+        <span class="muted small" id="threadHow"></span>
+      </div>
+      <div id="thread" class="thread-view" aria-live="polite"></div>
+    </section>
+  </div>
+
+  <!-- 4. Queues and log -->
+  <section class="card lists" id="lists" aria-label="Needs a person, morning queue and activity log">
+    <div class="tabs" role="tablist" aria-label="Queues and log">
+      <button type="button" role="tab" id="tab-person" aria-controls="pane-person" data-tab="person">Needs a person <span class="chip" id="nPerson">0</span></button>
+      <button type="button" role="tab" id="tab-queue" aria-controls="pane-queue" data-tab="queue">Waiting for 7 AM <span class="chip" id="nQueue">0</span></button>
+      <button type="button" role="tab" id="tab-log" aria-controls="pane-log" data-tab="log">Activity log <span class="chip" id="nLog">0</span></button>
+    </div>
+    <div class="pane" role="tabpanel" id="pane-person" aria-labelledby="tab-person">
+      <div class="pane-h"><p class="muted small">Anything the automation isn't sure about lands here with the full story: which thread it looked for, what it found, and the update it was going to post. A person decides.</p></div>
+      <div id="person" class="person-list"></div>
+    </div>
+    <div class="pane" role="tabpanel" id="pane-queue" aria-labelledby="tab-queue" hidden>
+      <div class="pane-h"><p class="muted small">Homeowner updates that came up between 8 PM and 7 AM. They go out at 7:00 AM, after one more check that the customer hasn't written in overnight. Vendors are exempt.</p></div>
+      <div id="queue" class="queue"></div>
+    </div>
+    <div class="pane" role="tabpanel" id="pane-log" aria-labelledby="tab-log" hidden>
+      <div class="pane-h"><p class="muted small">Every event, newest first, including skipped duplicates. Saved in this browser.</p><button type="button" class="btn ghost small" id="clearLog">Clear log</button></div>
+      <ol id="log" class="log"></ol>
+    </div>
+  </section>
+
+  <!-- 5. Rules -->
+  <section class="card rules-card" aria-labelledby="rulesTitle">
+    <div class="sec-head"><h2 id="rulesTitle">The safety rules it follows</h2></div>
+    <ol class="rules" id="rules"></ol>
+  </section>
+
+  <!-- 6. Cost -->
+  <section class="card cost-card" aria-labelledby="costTitle">
+    <div class="sec-head"><h2 id="costTitle">What it costs to run</h2></div>
+    <div class="cost-grid">
+      <div class="cost-cell"><span class="c-k">Per update, Google Workspace</span><b>$0</b><span class="c-s">Apps Script and the Gmail API are included with Workspace, within Google's daily quotas. A small shop posts a few dozen updates a day.</span></div>
+      <div class="cost-cell"><span class="c-k">Optional AI rewrite</span><b>~0.1¢</b><span class="c-s">Templates are the default and need no AI. If you want a model to smooth the wording, it's a fraction of a cent per update.</span></div>
+      <div class="cost-cell"><span class="c-k">n8n instead</span><b>$5+/mo</b><span class="c-s">Self-hosted on a small server from about $5 a month, or n8n Cloud on a monthly plan. Pricing changes, so check n8n's current page.</span></div>
+      <div class="cost-cell"><span class="c-k">Helpdesk and portals</span><b>$0 extra</b><span class="c-s">Comments go through the helpdesk's or vendor portal's own API with the login you already have.</span></div>
+    </div>
+    <p class="muted small cost-note">Ted builds it for a fixed price, then a monthly retainer covers running it: keeping an eye on the Needs a person queue, adding templates when you take on a new vendor, and fixing what breaks.</p>
+  </section>
+</main>
+
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+<footer class="demo-foot">
+  Summit Home Services, Northstar Home Warranty, Bluepeak Protection Plans and Harbor Appliance Care are fictional, and so is every name, address, claim and ticket number here. Nothing is sent anywhere: the threads, clock and pipeline all run in your browser.
+  Built by <a href="https://tedkelly.dev/">Ted Kelly</a>. The same logic ships as a <a href="apps-script/thread-updates.gs">Google Apps Script</a> and an <a href="n8n/m3-thread-updates.json">importable n8n workflow</a>.
+</footer>
+
+<script src="shared/data.js"></script>
+<script src="engine.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
