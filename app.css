@@ -90,7 +90,7 @@ main.wrap { display: grid; gap: 16px; }
 @media (prefers-reduced-motion: reduce) { .msg.fresh, .cm.fresh, tr.fresh { animation: none; } .toast { transition: none; } }
 .atts { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 8px; }
 .att { display: inline-flex; gap: 8px; align-items: center; border: 1px solid var(--line); border-radius: 8px; padding: 5px 10px 5px 6px; font-size: .8rem; background: var(--bg); max-width: 100%; overflow-wrap: anywhere; margin-top: 4px; }
-.att-ic { font-family: var(--mono); font-size: .6rem; font-weight: 700; background: var(--bad); color: #fff; border-radius: 4px; padding: 2px 4px; }
+.att-ic { font-family: var(--mono); font-size: .6rem; font-weight: 700; background: var(--bad); color: var(--card); border-radius: 4px; padding: 2px 4px; }
 .dots { margin-top: 8px; border: 1px solid var(--line); background: var(--bg-2); border-radius: 6px; padding: 0 8px; line-height: 1.2; font-size: .8rem; letter-spacing: 1px; cursor: pointer; color: var(--ink-soft); }
 .quoted { margin-top: 8px; padding-left: 10px; border-left: 2px solid var(--line); color: var(--ink-soft); font-size: .8rem; overflow-wrap: anywhere; }
 .hdrs { margin-top: 8px; font-size: .74rem; }
