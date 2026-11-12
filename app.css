@@ -55,7 +55,7 @@ main.wrap { display: grid; gap: 16px; }
 /* Gmail-like conversation */
 .convo, .mailview { background: var(--card); }
 .subj { display: flex; align-items: center; gap: 8px; padding: 12px 14px 10px; border-bottom: 1px solid var(--line); flex-wrap: wrap; }
-.subj h4 { font-family: var(--sans); font-size: 1rem; font-weight: 600; flex: 1 1 220px; min-width: 0; overflow-wrap: anywhere; }
+.subj h4, .subj h3 { font-family: var(--sans); font-size: 1rem; font-weight: 600; flex: 1 1 220px; min-width: 0; overflow-wrap: anywhere; }
 .subj .count { font-size: .75rem; color: var(--ink-soft); }
 .msgs { display: grid; }
 .msg { border-bottom: 1px solid var(--line); }
@@ -220,7 +220,7 @@ body.is-shadow .sw-state { background: var(--shade); color: #fff; }
 .pt-bar { background: var(--warn-soft); color: var(--warn); }
 .pill-st { margin-left: auto; font-size: .7rem; font-weight: 700; padding: 2px 10px; border-radius: 999px; background: var(--card); color: var(--ink); border: 1px solid var(--line); }
 .pill-st.good { background: var(--good); color: var(--card); border-color: var(--good); }
-.ticketview h4, .portalview h4 { font-size: 1rem; padding: 12px 16px 4px; overflow-wrap: anywhere; }
+.ticketview h3, .portalview h3 { font-size: 1rem; padding: 12px 16px 4px; overflow-wrap: anywhere; }
 .tk-fields { display: grid; grid-template-columns: auto minmax(0, 1fr) auto minmax(0, 1fr) auto minmax(0, 1fr); gap: 2px 8px; padding: 0 16px 10px; font-size: .78rem; border-bottom: 1px solid var(--line); }
 .tk-fields dt { color: var(--ink-soft); }
 @media (max-width: 640px) { .tk-fields { grid-template-columns: auto minmax(0, 1fr); } }

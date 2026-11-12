@@ -236,13 +236,13 @@
     const isOpen = (x, i) => ui.open[x.id] != null ? ui.open[x.id] : (i === msgs.length - 1 || x.unread);
     if (t.kind === 'email') {
       el.innerHTML = `<div class="mailview">
-        <div class="subj"><h4>${esc(lastReal.length > 1 || msgs.length > 1 ? T.replySubject(t.subject) : t.subject)}</h4><span class="chip">Inbox</span><span class="count">${msgs.length}</span></div>
+        <div class="subj"><h3>${esc(lastReal.length > 1 || msgs.length > 1 ? T.replySubject(t.subject) : t.subject)}</h3><span class="chip">Inbox</span><span class="count">${msgs.length}</span></div>
         <div class="msgs">${msgs.map((x, i) => msgHtml(x, { open: isOpen(x, i), fresh: x.id === ui.fresh, quote: x.by === 'auto' && i ? msgs[i - 1] : null })).join('')}</div>
       </div>`;
     } else if (t.kind === 'ticket') {
       el.innerHTML = `<div class="ticketview">
         <div class="tk-bar"><span class="tk-sys">${esc(T.CHANNELS.V1.system)}</span><span class="mono">Ticket ${esc(t.id)}</span><span class="pill-st ${t.ticketStatus === 'Solved' ? 'good' : ''}">${esc(t.ticketStatus)}</span></div>
-        <h4>${esc(t.subject)}</h4>
+        <h3>${esc(t.subject)}</h3>
         <dl class="tk-fields"><dt>Claim #</dt><dd class="mono">${esc(t.claim)}</dd><dt>Requester</dt><dd>${esc(t.messages[0].name)}</dd><dt>Assignee</dt><dd>Summit Home Services</dd></dl>
         <ol class="comments">${msgs.map(x => `<li class="cm by-${x.by}${x.draft ? ' draft' : ''}${x.unread ? ' unread' : ''}${x.id === ui.fresh ? ' fresh' : ''}">
           <span class="av av-${x.by}" aria-hidden="true">${esc(x.by === 'auto' ? 'S' : initials(x.name))}</span>
@@ -255,7 +255,7 @@
     } else {
       el.innerHTML = `<div class="portalview">
         <div class="pt-bar"><span class="pt-sys">${esc(T.CHANNELS.V3.system)}</span><span class="pill-st ${t.portalStatus === 'Completed' ? 'good' : ''}">${esc(t.portalStatus)}</span></div>
-        <h4>Claim <span class="mono">${esc(t.id)}</span> · ${esc(S.byId(S.customers, t.customerId).name)}</h4>
+        <h3>Claim <span class="mono">${esc(t.id)}</span> · ${esc(S.byId(S.customers, t.customerId).name)}</h3>
         <table class="pt-notes"><caption class="sr-only">Claim notes</caption><thead><tr><th scope="col">When</th><th scope="col">By</th><th scope="col">Note</th></tr></thead>
         <tbody>${msgs.map(x => `<tr class="by-${x.by}${x.draft ? ' draft' : ''}${x.unread ? ' unread' : ''}${x.id === ui.fresh ? ' fresh' : ''}"><td class="mono nowrap">${esc(T.fmtDay(x.at))}<br>${esc(T.h24(x.at))}</td>
           <td>${esc(x.by === 'auto' ? 'Summit (auto)' : x.name)}${x.draft ? '<br><span class="chip shade">Draft</span>' : ''}${x.unread ? '<br><span class="chip bad">Unread</span>' : ''}</td>
